@@ -1509,7 +1509,11 @@ export function AudioView() {
   /* ── Render ────────────── */
 
   if (loading) {
-    return <LoadingState label="Loading audio configuration..." size="lg" />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading audio configuration..." size="lg" />
+      </SectionLayout>
+    );
   }
 
   if (!data) {

@@ -25,11 +25,11 @@ import {
   Activity,
   MessageSquare,
   Trash2,
-  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchModal } from "./search-modal";
 import { PairingNotifications } from "./pairing-notifications";
+import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
 import { chatStore, type ChatMessage } from "@/lib/chat-store";
 import {
@@ -434,8 +434,8 @@ export function notifyGatewayRestarting() {
 }
 
 function useGatewayStatus() {
-  const { status, health } = useGatewayStatusStore();
-  return { status, health };
+  const { status, health, latencyMs } = useGatewayStatusStore();
+  return { status, health, latencyMs };
 }
 
 /* ── Gateway Status Badge ──────────────────────── */
@@ -443,9 +443,11 @@ function useGatewayStatus() {
 function GatewayStatusBadge({
   status,
   health,
+  latencyMs,
 }: {
   status: GatewayStatus;
   health: GatewayHealth | null;
+  latencyMs?: number | null;
 }) {
   const [showPopover, setShowPopover] = useState(false);
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -629,7 +631,7 @@ function GatewayStatusBadge({
           {/* Footer hint */}
           <div className="border-t border-border px-3.5 py-2">
             <p className="text-xs text-muted-foreground/50">
-              Polling every 12s · Use the power button to control gateway
+              {latencyMs !== null && latencyMs !== undefined ? `${latencyMs}ms · ` : ""}Polling every 12s · Use the power button to control gateway
             </p>
           </div>
         </div>
@@ -653,7 +655,7 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const chat = useChatState();
   const { isAlive, busy: powerBusy, toggle: togglePower } = useGatewayPower();
-  const { status: gwStatus, health: gwHealth } = useGatewayStatus();
+  const { status: gwStatus, health: gwHealth, latencyMs: gwLatencyMs } = useGatewayStatus();
 
   // Global Cmd+K / Ctrl+K shortcut
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -672,7 +674,7 @@ export function Header() {
     <>
       <header className="flex shrink-0 items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-3 md:px-8 dark:border-[#23282e] dark:bg-[#121519]">
         <div className="flex items-center gap-2">
-          <GatewayStatusBadge status={gwStatus} health={gwHealth} />
+          <GatewayStatusBadge status={gwStatus} health={gwHealth} latencyMs={gwLatencyMs} />
         </div>
 
         <div className="flex items-center gap-2">
@@ -753,13 +755,7 @@ export function Header() {
           {/* Pairing Notifications */}
           <PairingNotifications />
 
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:border-[#2c343d] dark:bg-[#171a1d] dark:text-[#a8b0ba] dark:hover:bg-[#20252a] dark:hover:text-[#f5f7fa]"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
+          <NotificationCenter />
 
           {/* ── Settings ── */}
 

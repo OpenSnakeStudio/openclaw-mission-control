@@ -1741,7 +1741,11 @@ export function ConfigEditor() {
   /* ── Loading state ─────────────── */
 
   if (loading) {
-    return <LoadingState label="Loading configuration..." size="lg" />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading configuration..." size="lg" />
+      </SectionLayout>
+    );
   }
 
   if (!rawConfig) {

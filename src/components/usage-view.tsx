@@ -843,7 +843,11 @@ export function UsageView() {
   }, [orBilling, orModelBreakdown]);
 
   if (loading) {
-    return <LoadingState label="Loading usage data..." size="lg" className="h-full" />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading usage data..." size="lg" />
+      </SectionLayout>
+    );
   }
 
   if (error || !data) {

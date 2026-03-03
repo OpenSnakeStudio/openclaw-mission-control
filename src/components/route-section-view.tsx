@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { DashboardView } from "@/components/dashboard-view";
 import { ChatView } from "@/components/chat-view";
+import { PanelErrorBoundary } from "@/components/panel-error-boundary";
 import { setChatActive } from "@/lib/chat-store";
 
 function SectionLoading() {
@@ -114,6 +115,10 @@ const DoctorView = dynamic(
   () => import("@/components/doctor-view").then((m) => m.DoctorView),
   { loading: () => <SectionLoading /> }
 );
+const ActivityView = dynamic(
+  () => import("@/components/activity-view").then((m) => m.ActivityView),
+  { loading: () => <SectionLoading /> }
+);
 const HelpView = dynamic(
   () => import("@/components/help-view").then((m) => m.HelpView),
   { loading: () => <SectionLoading /> }
@@ -150,6 +155,7 @@ export type DashboardSection =
   | "settings"
   | "hooks"
   | "doctor"
+  | "activity"
   | "help";
 
 function SectionContent({ section }: { section: DashboardSection }) {
@@ -212,6 +218,8 @@ function SectionContent({ section }: { section: DashboardSection }) {
       return <HooksView />;
     case "doctor":
       return <DoctorView />;
+    case "activity":
+      return <ActivityView />;
     case "help":
       return <HelpView />;
     default:
@@ -232,11 +240,15 @@ export function RouteSectionView({ section }: { section: DashboardSection }) {
       <div
         className={isChatSection ? "flex flex-1 flex-col overflow-hidden" : "hidden"}
       >
-        <ChatView isVisible={isChatSection} />
+        <PanelErrorBoundary section="chat">
+          <ChatView isVisible={isChatSection} />
+        </PanelErrorBoundary>
       </div>
 
       {!isChatSection && (
-        <SectionContent section={section} />
+        <PanelErrorBoundary key={section} section={section}>
+          <SectionContent section={section} />
+        </PanelErrorBoundary>
       )}
     </>
   );

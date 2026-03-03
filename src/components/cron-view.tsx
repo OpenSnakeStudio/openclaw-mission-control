@@ -2021,7 +2021,11 @@ export function CronView() {
   }, [expanded, runOutput]);
 
   if (loading) {
-    return <LoadingState label="Loading cron jobs..." />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading cron jobs..." />
+      </SectionLayout>
+    );
   }
 
   const errorJobs = jobs.filter((j) => {
@@ -2053,7 +2057,7 @@ export function CronView() {
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium transition-colors hover:bg-primary/90"
+              className="flex items-center gap-1.5 rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-700 dark:bg-[#f5f7fa] dark:text-[#111418] dark:hover:bg-[#dfe5eb]"
             >
               <Plus className="h-3 w-3" /> New Cron Job
             </button>
@@ -2063,7 +2067,7 @@ export function CronView() {
                 setLoading(true);
                 fetchJobs();
               }}
-              className="flex items-center gap-1.5 rounded-lg border border-foreground/10 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/80"
+              className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900 dark:border-[#2c343d] dark:bg-[#171a1d] dark:text-[#c7d0d9] dark:hover:bg-[#20252a] dark:hover:text-[#f5f7fa]"
             >
               <RefreshCw className="h-3 w-3" /> Refresh
             </button>
@@ -2088,13 +2092,13 @@ export function CronView() {
         {/* Empty state */}
         {jobs.length === 0 && !showCreate && (
           <div className="flex flex-col items-center justify-center py-16">
-            <Calendar className="mx-auto h-10 w-10 text-zinc-700 mb-3" />
-            <p className="text-sm text-muted-foreground/85 mb-1">No cron jobs yet</p>
-            <p className="text-xs text-muted-foreground/75 mb-4">Create your first scheduled task to get started.</p>
+            <Calendar className="mx-auto mb-3 h-10 w-10 text-stone-400 dark:text-[#7a8591]" />
+            <p className="mb-1 text-sm text-stone-700 dark:text-[#d6dce3]">No cron jobs yet</p>
+            <p className="mb-4 text-xs text-stone-500 dark:text-[#8d98a5]">Create your first scheduled task to get started.</p>
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/90"
+              className="flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-700 dark:bg-[#f5f7fa] dark:text-[#111418] dark:hover:bg-[#dfe5eb]"
             >
               <Plus className="h-4 w-4" /> Create Cron Job
             </button>
@@ -2125,10 +2129,10 @@ export function CronView() {
               key={job.id}
               id={`cron-job-${job.id}`}
               className={cn(
-                "rounded-xl border bg-card/90 transition-colors",
+                "rounded-xl border bg-white transition-colors dark:bg-[#171a1d]",
                 hasError
                   ? "border-red-500/20"
-                  : "border-foreground/10",
+                  : "border-stone-200 dark:border-[#2c343d]",
                 hasError && expanded === job.id && "ring-1 ring-red-500/30",
                 isFocusedFromLink && "ring-1 ring-stone-400/40 dark:ring-[#4d5864]"
               )}
@@ -2170,7 +2174,7 @@ export function CronView() {
                       {job.name}
                     </p>
                     {!job.enabled && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground/80">
+                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-500 dark:bg-[#20252a] dark:text-[#8d98a5]">
                         DISABLED
                       </span>
                     )}

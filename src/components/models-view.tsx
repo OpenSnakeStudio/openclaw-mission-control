@@ -1799,7 +1799,11 @@ export function ModelsView() {
   // ── Loading / error states ──
 
   if (summaryLoading && !status) {
-    return <LoadingState label="Loading models..." />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading models..." />
+      </SectionLayout>
+    );
   }
 
   if (!status) {

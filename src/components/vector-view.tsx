@@ -903,7 +903,13 @@ export function VectorView() {
     (!memorySearch && !curProv) ||
     (totalChunks === 0 && totalFiles === 0 && !curProv);
 
-  if (loading) return <LoadingState label="Loading vector memory..." size="lg" />;
+  if (loading) {
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading vector memory..." size="lg" />
+      </SectionLayout>
+    );
+  }
 
   if (needsSetup) {
     return (

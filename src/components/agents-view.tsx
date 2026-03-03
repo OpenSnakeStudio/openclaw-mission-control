@@ -3880,7 +3880,11 @@ export function AgentsView() {
       : "Subagent orchestration, controls, and defaults";
 
   if (loading) {
-    return <LoadingState label="Loading agents..." />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading agents..." />
+      </SectionLayout>
+    );
   }
 
   if (error || !data) {

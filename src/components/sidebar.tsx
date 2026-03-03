@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, useCallback, useSyncExternalStore, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
+  Activity,
   LayoutDashboard,
   ListChecks,
   Clock,
@@ -86,7 +87,8 @@ const navItems: NavItem[] = [
   { section: "config", label: "Config", icon: Settings, href: "/config" },
   ...(isAgentbayHosting ? [{ section: "help" as const, label: "Help & support", icon: HelpCircle, href: "/help" } as NavItem] : []),
   // ── Monitoring ──
-  { group: "Monitoring", section: "doctor", label: "Doctor", icon: Stethoscope, href: "/doctor" },
+  { group: "Monitoring", section: "activity", label: "Activity", icon: Activity, href: "/activity" },
+  { section: "doctor", label: "Doctor", icon: Stethoscope, href: "/doctor" },
   { section: "usage", label: "Usage", icon: BarChart3, href: "/usage" },
   { section: "terminal", label: "Terminal", icon: SquareTerminal, href: "/terminal" },
   { section: "logs", label: "Logs", icon: Terminal, href: "/logs" },
@@ -142,6 +144,7 @@ function deriveSectionFromPath(pathname: string): string | null {
     "logs",
     "config",
     "settings",
+    "activity",
     "help",
   ]);
   return known.has(first) ? first : null;

@@ -529,7 +529,11 @@ export function HooksView() {
   }, [data]);
 
   if (loading) {
-    return <LoadingState label="Loading hooks..." size="lg" className="h-full" />;
+    return (
+      <SectionLayout>
+        <LoadingState label="Loading hooks..." size="lg" />
+      </SectionLayout>
+    );
   }
 
   if (error || !data) {

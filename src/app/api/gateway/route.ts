@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { gatewayCall } from "@/lib/openclaw";
 import { getOpenClawBin, getGatewayUrl } from "@/lib/paths";
+import { logRequest, logError } from "@/lib/request-log";
 import { execFile } from "child_process";
 import { promisify } from "util";
 
@@ -88,10 +89,12 @@ async function probeGatewayHttp(): Promise<{
  *      data when RPC completes in time.
  */
 export async function GET() {
+  const start = Date.now();
   // Fast liveness check first
   const probe = await probeGatewayHttp();
 
   if (!probe.ok) {
+    logRequest("/api/gateway", 200, Date.now() - start, { gateway: "offline" });
     return NextResponse.json({
       status: "offline",
       health: { ok: false, error: "Gateway HTTP endpoint not reachable" },
@@ -107,8 +110,10 @@ export async function GET() {
       gatewayCall<Record<string, unknown>>("health", {}, 12000),
       gatewayCall<Record<string, unknown>>("status", {}, 12000).catch(() => null),
     ]);
+    const gwStatus = health.ok === true ? "online" : "degraded";
+    logRequest("/api/gateway", 200, Date.now() - start, { gateway: gwStatus });
     return NextResponse.json({
-      status: health.ok === true ? "online" : "degraded",
+      status: gwStatus,
       health,
       ...(status ? { gatewayStatus: status } : {}),
     });
@@ -117,6 +122,7 @@ export async function GET() {
   }
 
   // Gateway is reachable but full health data unavailable — report online
+  logRequest("/api/gateway", 200, Date.now() - start, { gateway: "online", lite: true });
   return NextResponse.json({
     status: "online",
     health: { ok: true, port: probe.port, note: "Lite probe (full health unavailable)" },
@@ -210,7 +216,7 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   } catch (err) {
-    console.error("Gateway POST error:", err);
+    logError("/api/gateway", err);
     return NextResponse.json(
       { error: String(err) },
       { status: 500 }
