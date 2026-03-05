@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   if (account) args.push("--account", account);
 
   const proc = spawn(bin, args, {
-    env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
+    env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0", OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1" },
     timeout: PROCESS_TIMEOUT_MS,
     stdio: ["ignore", "pipe", "pipe"],
   });

@@ -84,7 +84,7 @@ async function runGatewayServiceCommand(
   const bin = await getOpenClawBin();
   return exec(bin, ["gateway", subcommand], {
     timeout,
-    env: { ...process.env, NO_COLOR: "1" },
+    env: { ...process.env, NO_COLOR: "1", OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1" },
   });
 }
 

@@ -185,7 +185,7 @@ async function runClawHub(args: string[], timeout = 30000): Promise<{ stdout: st
   const { stdout, stderr } = await exec("clawhub", fullArgs, {
     cwd: workspace,
     timeout,
-    env: { ...process.env, NO_COLOR: "1" },
+    env: { ...process.env, NO_COLOR: "1", OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1" },
   });
   return { stdout, stderr };
 }

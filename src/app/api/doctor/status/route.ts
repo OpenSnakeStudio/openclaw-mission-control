@@ -25,7 +25,7 @@ async function runDoctor(): Promise<{ stdout: string; stderr: string; exitCode: 
   try {
     const { stdout, stderr } = await exec(bin, ["doctor", "--non-interactive"], {
       timeout: 45000,
-      env: { ...process.env, NO_COLOR: "1" },
+      env: { ...process.env, NO_COLOR: "1", OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1" },
     });
     return { stdout: stdout || "", stderr: stderr || "", exitCode: 0 };
   } catch (err) {
