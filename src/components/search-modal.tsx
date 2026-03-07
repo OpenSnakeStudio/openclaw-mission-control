@@ -49,9 +49,19 @@ function pathDisplay(path: string): { icon: string; label: string } {
   return { icon: "📄", label: path };
 }
 
-/** Highlight markdown-style bold tokens as HTML */
-function highlightSnippet(text: string): string {
+/** Escape HTML entities to prevent XSS */
+function escapeHtml(text: string): string {
   return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Highlight markdown-style bold tokens as HTML (sanitized) */
+function highlightSnippet(text: string): string {
+  return escapeHtml(text)
     .replace(/\*\*(.+?)\*\*/g, '<span class="text-foreground/90 font-semibold">$1</span>')
     .replace(/`([^`]+)`/g, '<code class="rounded bg-muted px-1 py-0.5 text-xs text-violet-300 font-mono">$1</code>');
 }
@@ -66,19 +76,29 @@ export function SearchModal({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultListRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const focusTrapRef = useFocusTrap(open);
   useBodyScrollLock(open);
 
-  // Reset state when modal opens (focus is handled by useFocusTrap)
+  // Reset state when modal opens; auto-focus input
   useEffect(() => {
     if (open) {
       setQuery("");
       setResults([]);
       setSearched(false);
       setSelectedIdx(0);
+      setError(null);
+      // Focus input after DOM settles (focus trap may also handle this)
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
     }
+    // Clean up debounce and in-flight fetch when closing
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
   }, [open]);
 
   // Debounced search
@@ -87,17 +107,29 @@ export function SearchModal({ open, onClose }: Props) {
       setResults([]);
       setSearched(false);
       setLoading(false);
+      setError(null);
       return;
     }
+    // Abort any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setSearched(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Search failed (${res.status})`);
       const data = await res.json();
+      if (data.error) throw new Error(data.error);
       setResults(data.results || []);
       setSelectedIdx(0);
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setResults([]);
+      setError(err instanceof Error ? err.message : "Search failed");
     } finally {
       setLoading(false);
     }
@@ -121,6 +153,14 @@ export function SearchModal({ open, onClose }: Props) {
     router.push(next ? `/memory?${next}` : "/memory", { scroll: false });
     onClose();
   }, [onClose, query, router, searchParams]);
+
+  // Scroll selected result into view
+  useEffect(() => {
+    const container = resultListRef.current;
+    if (!container || results.length === 0) return;
+    const buttons = container.querySelectorAll<HTMLButtonElement>("button[data-result]");
+    buttons[selectedIdx]?.scrollIntoView({ block: "nearest" });
+  }, [selectedIdx, results.length]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -188,7 +228,7 @@ export function SearchModal({ open, onClose }: Props) {
           </div>
 
           {/* Results */}
-          <div className="max-h-96 overflow-x-hidden overflow-y-auto">
+          <div ref={resultListRef} className="max-h-96 overflow-x-hidden overflow-y-auto">
             {/* Hint when empty */}
             {!searched && !loading && (
               <div className="flex flex-col items-center gap-3 px-4 py-10 text-center sm:px-6">
@@ -218,8 +258,15 @@ export function SearchModal({ open, onClose }: Props) {
               </div>
             )}
 
+            {/* Error state */}
+            {error && !loading && (
+              <div className="px-4 py-10 text-center text-sm text-red-400 sm:px-6">
+                {error}
+              </div>
+            )}
+
             {/* No results */}
-            {searched && !loading && results.length === 0 && (
+            {searched && !loading && !error && results.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground/60 sm:px-6">
                 No matches found for &quot;{query}&quot;
               </div>
@@ -240,6 +287,7 @@ export function SearchModal({ open, onClose }: Props) {
                     <button
                       key={`${result.path}-${result.startLine}`}
                       type="button"
+                      data-result
                       className={cn(
                         "flex w-full min-w-0 flex-col gap-1.5 px-4 py-3 text-left transition-colors sm:px-6",
                         isSelected
