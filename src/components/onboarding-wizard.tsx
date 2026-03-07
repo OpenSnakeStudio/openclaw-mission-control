@@ -506,9 +506,11 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
       return;
     }
 
+    const controller = new AbortController();
+
     const poll = async () => {
       try {
-        const res = await fetch("/api/pairing", { cache: "no-store" });
+        const res = await fetch("/api/pairing", { cache: "no-store", signal: controller.signal });
         if (!res.ok) return;
         const data = await res.json();
         const nextRequests = Array.isArray(data.dm)
@@ -516,7 +518,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
           : [];
         setPairingRequests(nextRequests);
       } catch {
-        // Silent polling failure.
+        // Silent polling failure (includes abort).
       }
     };
 
@@ -526,6 +528,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     }, 4000);
 
     return () => {
+      controller.abort();
       if (pairingPollRef.current) clearInterval(pairingPollRef.current);
       pairingPollRef.current = null;
     };
@@ -580,15 +583,22 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     }
   }, [saveCredentials]);
 
-  const waitForGatewayHealth = useCallback(async (maxAttempts = 15): Promise<boolean> => {
+  const waitForGatewayHealth = useCallback(async (channel?: string, maxAttempts = 15): Promise<boolean> => {
     setHealthProgress(0);
+    const url = channel ? `/api/channels/health?channel=${encodeURIComponent(channel)}` : "/api/channels/health";
     for (let i = 0; i < maxAttempts; i++) {
       setHealthProgress(Math.round(((i + 1) / maxAttempts) * 100));
       try {
-        const res = await fetch("/api/channels/health", { cache: "no-store" });
+        const res = await fetch(url, { cache: "no-store" });
         if (res.ok) {
-          setHealthProgress(100);
-          return true;
+          const data = await res.json();
+          // If checking a specific channel, wait until it's ready
+          if (channel && data.channelReady === false) {
+            // Gateway is up but channel not ready yet — keep polling
+          } else {
+            setHealthProgress(100);
+            return true;
+          }
         }
       } catch { /* retry */ }
       await new Promise((r) => setTimeout(r, 2000));
@@ -638,9 +648,9 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
         throw new Error(data.error || `Could not connect ${currentChannel.label}.`);
       }
 
-      // Phase 3: Wait for gateway restart
+      // Phase 3: Wait for gateway restart and channel readiness
       setConnectPhase("restarting");
-      const healthy = await waitForGatewayHealth();
+      const healthy = await waitForGatewayHealth(currentChannel.id);
       if (!healthy) {
         throw new Error("Gateway did not come back online. Check the logs.");
       }
@@ -670,6 +680,8 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
   }, [channelAppToken, channelToken, currentChannel, waitForGatewayHealth]);
 
   const handleApprovePairing = useCallback(async (request: PairingRequest) => {
+    // Idempotency guard: skip if already approved or in-flight
+    if (approvedCodes.has(request.code) || approvingCode) return;
     setApprovingCode(request.code);
     setPairingError(null);
     try {
@@ -692,7 +704,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     } finally {
       setApprovingCode(null);
     }
-  }, []);
+  }, [approvedCodes, approvingCode]);
 
   const runQuickSetup = useCallback(async () => {
     setLaunchError(null);
@@ -729,7 +741,6 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     setStep("finishing");
     void runQuickSetup();
   }, [runQuickSetup]);
-
 
   const visibleStepIndex = step === "model" ? 0 : step === "channel" ? 1 : 1;
   const continueDisabled = !apiKey.trim() || testingKey || keyValid !== true || status?.installed === false;
@@ -1100,15 +1111,34 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
                   <div className="flex justify-between pt-2">
                     <button
                       type="button"
-                      onClick={() => setStep("model")}
-                      className="rounded-full px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => {
+                        setSelectedChannel(null);
+                        setChannelToken("");
+                        setChannelAppToken("");
+                        setChannelResult(null);
+                        setConnectPhase("idle");
+                        setStep("model");
+                      }}
+                      disabled={channelBusy}
+                      className={cn(
+                        "rounded-full px-5 py-2.5 text-sm font-medium transition-colors",
+                        channelBusy
+                          ? "cursor-not-allowed text-muted-foreground/40"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
                     >
                       Back
                     </button>
                     <button
                       type="button"
                       onClick={finishSetup}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      disabled={channelBusy}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors",
+                        channelBusy
+                          ? "cursor-not-allowed text-muted-foreground/40"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
                     >
                       <SkipForward className="h-3.5 w-3.5" />
                       Skip
@@ -1242,7 +1272,13 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
                     <button
                       type="button"
                       onClick={finishSetup}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                      disabled={channelBusy}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-medium transition-opacity",
+                        channelBusy
+                          ? "cursor-not-allowed bg-muted text-muted-foreground"
+                          : "bg-primary text-primary-foreground hover:opacity-90",
+                      )}
                     >
                       Continue
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -1357,9 +1393,9 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
                 throw new Error(data.error || "Could not enable WhatsApp in config.");
               }
 
-              // Wait for gateway restart
+              // Wait for gateway restart and channel readiness
               setConnectPhase("restarting");
-              const healthy = await waitForGatewayHealth();
+              const healthy = await waitForGatewayHealth(qrChannel);
               if (!healthy) {
                 throw new Error("Gateway did not come back online. Check the logs.");
               }

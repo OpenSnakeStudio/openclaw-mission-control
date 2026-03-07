@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { access, readFile, writeFile, mkdir } from "fs/promises";
 import { join, dirname } from "path";
 import { gatewayCall, runCli } from "@/lib/openclaw";
+import { patchConfig } from "@/lib/gateway-config";
 import { getOpenClawBin, getOpenClawHome, getGatewayUrl } from "@/lib/paths";
 import {
   buildProviderCredentialPatch,
@@ -53,18 +54,7 @@ async function writeJsonAtomic(p: string, data: unknown): Promise<void> {
 }
 
 async function applyGatewayConfigPatch(rawPatch: Record<string, unknown>): Promise<void> {
-  const cfg = await gatewayCall<Record<string, unknown>>("config.get", undefined, 15000);
-  const baseHash = String(cfg?.hash || "");
-
-  await gatewayCall(
-    "config.patch",
-    {
-      raw: JSON.stringify(rawPatch),
-      baseHash,
-      restartDelayMs: 2000,
-    },
-    20000,
-  );
+  await patchConfig(rawPatch, { restartDelayMs: 2000 });
 }
 
 async function checkGatewayHealth(
