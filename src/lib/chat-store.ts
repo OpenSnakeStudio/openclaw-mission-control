@@ -251,7 +251,7 @@ export const chatStore = {
 
     const agentId = pingState.agentId;
     const chatBody = JSON.stringify({
-      agent: agentId,
+      agentId,
       messages: [
         {
           role: "user",
@@ -270,7 +270,10 @@ export const chatStore = {
         body: chatBody,
       });
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        throw new Error(errBody || `${res.status} ${res.statusText}`);
+      }
 
       // Read as a stream to show progressive text in the ping panel
       let text = "";
@@ -280,11 +283,18 @@ export const chatStore = {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let lastPersist = 0;
+        let gotFirstChunk = false;
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           text += decoder.decode(value, { stream: true });
+
+          // Clear 'sending' (typing indicator) once first chunk arrives
+          // so the UI shows streaming text instead of "Agent is thinking..."
+          if (!gotFirstChunk) {
+            gotFirstChunk = true;
+          }
 
           // Update the streaming message in-place for progressive display
           const streamingMsg: ChatMessage = {
@@ -301,6 +311,7 @@ export const chatStore = {
           pingState = {
             ...pingState,
             messages: streamUpdated,
+            sending: !gotFirstChunk,
           };
           emitPing();
 
@@ -319,10 +330,16 @@ export const chatStore = {
       }
 
       // Finalize the message
+      const trimmed = text.trim();
+      if (!trimmed) {
+        // Empty response — show as error instead of blank bubble
+        throw new Error("Agent returned an empty response. The gateway may still be starting up — try again in a moment.");
+      }
+
       const assistantMsg: ChatMessage = {
         id: assistantMsgId,
         role: "assistant",
-        text: text.trim(),
+        text: trimmed,
         timestamp: Date.now(),
         agentId,
       };
@@ -341,13 +358,14 @@ export const chatStore = {
       emitPing();
 
       if (!isStillOpen) {
-        chatStore._notify(agentId, text.trim());
+        chatStore._notify(agentId, trimmed);
       }
     } catch (err) {
+      const rawErr = err instanceof Error ? err.message : String(err);
       const errMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "error",
-        text: String(err),
+        text: rawErr,
         timestamp: Date.now(),
         agentId,
       };
