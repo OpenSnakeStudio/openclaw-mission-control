@@ -118,7 +118,11 @@ async function* parseOpenResponsesStream(
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      // Flush remaining decoder bytes + any trailing buffer content
+      buffer += decoder.decode();
+      break;
+    }
 
     buffer += decoder.decode(value, { stream: true });
 
@@ -144,6 +148,24 @@ async function* parseOpenResponsesStream(
         }
       } catch {
         // Non-JSON SSE line — skip
+      }
+    }
+  }
+
+  // Process any remaining buffered line after stream ends
+  if (buffer.trim()) {
+    const line = buffer.trim();
+    if (line.startsWith("data: ")) {
+      const data = line.slice(6);
+      if (data !== "[DONE]") {
+        try {
+          const event = JSON.parse(data);
+          if (event.type === "response.output_text.delta" && event.delta) {
+            yield event.delta;
+          }
+        } catch {
+          // Non-JSON — skip
+        }
       }
     }
   }

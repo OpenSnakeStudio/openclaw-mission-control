@@ -169,9 +169,25 @@ let pingState: PingChatState = {
 
 const pingListeners = new Set<Listener>();
 
+let _persistTimer: ReturnType<typeof setTimeout> | null = null;
+
 function emitPing() {
   pingListeners.forEach((fn) => { try { fn(); } catch { /* */ } });
-  // Persist on every state change (debounced writes are overkill for this size)
+  // Debounce localStorage writes during rapid updates (e.g. streaming)
+  if (!_persistTimer) {
+    _persistTimer = setTimeout(() => {
+      _persistTimer = null;
+      persistState(pingState);
+    }, 300);
+  }
+}
+
+/** Flush pending persist immediately (call after send completes, clear, etc.) */
+function flushPersist() {
+  if (_persistTimer) {
+    clearTimeout(_persistTimer);
+    _persistTimer = null;
+  }
   persistState(pingState);
 }
 
@@ -233,23 +249,26 @@ export const chatStore = {
   clearMessages() {
     pingState = { ...pingState, messages: [], unread: 0 };
     emitPing();
+    flushPersist();
   },
 
   async send(prompt: string) {
     if (!prompt.trim() || !pingState.agentId || pingState.sending) return;
+
+    // Capture agentId before any async work so setAgent() during flight
+    // doesn't change which agent this request targets
+    const agentId = pingState.agentId;
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       text: prompt.trim(),
       timestamp: Date.now(),
-      agentId: pingState.agentId,
+      agentId,
     };
 
     pingState = { ...pingState, messages: [...pingState.messages, userMsg], sending: true };
     emitPing();
-
-    const agentId = pingState.agentId;
     const chatBody = JSON.stringify({
       agentId,
       messages: [
@@ -282,7 +301,6 @@ export const chatStore = {
       if (res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
-        let lastPersist = 0;
         let gotFirstChunk = false;
 
         while (true) {
@@ -313,18 +331,12 @@ export const chatStore = {
             messages: streamUpdated,
             sending: !gotFirstChunk,
           };
+          // emitPing() debounces localStorage writes; UI updates are immediate
           emitPing();
-
-          // Debounce localStorage writes during streaming to at most once per 500ms
-          const now = Date.now();
-          if (now - lastPersist > 500) {
-            persistState(pingState);
-            lastPersist = now;
-          }
         }
 
-        // Always persist once when the stream completes
-        persistState(pingState);
+        // Flush persist after stream completes
+        flushPersist();
       } else {
         text = await res.text();
       }
@@ -356,6 +368,7 @@ export const chatStore = {
         unread: isStillOpen ? 0 : pingState.unread + 1,
       };
       emitPing();
+      flushPersist();
 
       if (!isStillOpen) {
         chatStore._notify(agentId, trimmed);
@@ -378,6 +391,7 @@ export const chatStore = {
         unread: isStillOpen ? 0 : pingState.unread + 1,
       };
       emitPing();
+      flushPersist();
 
       if (!isStillOpen) {
         chatStore._notify(agentId, "Error getting response");
