@@ -10,6 +10,7 @@ import { RestartAnnouncementBar } from "@/components/restart-announcement-bar";
 import { SetupGate } from "@/components/setup-gate";
 import { UsageAlertMonitor } from "@/components/usage-alert-monitor";
 import { OpenClawUpdateBanner } from "@/components/openclaw-update-banner";
+import { ToastRenderer } from "@/components/toast-renderer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -117,7 +118,8 @@ export default function RootLayout({
             <AgentChatPanel />
             <ChatNotificationToast />
             {!isHosted && <OpenClawUpdateBanner />}
-            {!isHosted && <UsageAlertMonitor />}
+            <UsageAlertMonitor />
+            <ToastRenderer />
           </SetupGate>
         </ThemeProvider>
       </body>
