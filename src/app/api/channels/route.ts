@@ -276,7 +276,6 @@ export async function POST(request: NextRequest) {
         }
         await patchConfig(
           { channels: { [channel]: patch } },
-          { restartDelayMs: 2000 },
         );
         return NextResponse.json({ ok: true });
       }

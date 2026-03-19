@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readdir, stat, unlink } from "fs/promises";
-import { dirname, extname, relative, resolve, sep } from "path";
+import { readdir, readFile, stat, unlink, writeFile } from "fs/promises";
+import { dirname, extname, join, relative, resolve, sep } from "path";
 import { runCliJson, gatewayCall } from "@/lib/openclaw";
 import { getOpenClawHome, getDefaultWorkspace } from "@/lib/paths";
 import { buildModelsSummary } from "@/lib/models-summary";
@@ -487,7 +487,7 @@ export async function POST(request: NextRequest) {
 
         await gatewayCall(
           "config.patch",
-          { raw: setupPatch, baseHash: setupHash, restartDelayMs: 2000 },
+          { raw: setupPatch, baseHash: setupHash },
           15000
         );
 
@@ -596,7 +596,7 @@ export async function POST(request: NextRequest) {
           delete nextMemorySearch.extraPaths;
         }
 
-        await patchMemorySearchConfig(hash, nextMemorySearch, 2000);
+        await patchMemorySearchConfig(hash, nextMemorySearch);
 
         let reindexWarning: string | undefined;
         if (body.reindex !== false) {
@@ -629,7 +629,30 @@ export async function POST(request: NextRequest) {
           ...currentMemorySearch,
           extraPaths: mergedExtra,
         };
-        await patchMemorySearchConfig(hash, memorySearch, 2000);
+        await patchMemorySearchConfig(hash, memorySearch);
+
+        // Also persist extraPaths to disk — gateway config.patch doesn't reliably
+        // write extraPaths to openclaw.json, so CLI indexing would see stale config.
+        try {
+          const home = getOpenClawHome();
+          const configPath = join(home, "openclaw.json");
+          let diskConfig: Record<string, unknown> = {};
+          try {
+            const raw = await readFile(configPath, "utf-8");
+            diskConfig = JSON.parse(raw) as Record<string, unknown>;
+          } catch { /* fresh */ }
+          const diskAgents = (diskConfig.agents || {}) as Record<string, unknown>;
+          const diskDefaults = (diskAgents.defaults || {}) as Record<string, unknown>;
+          const diskMs = (diskDefaults.memorySearch || {}) as Record<string, unknown>;
+          diskMs.extraPaths = mergedExtra;
+          diskDefaults.memorySearch = diskMs;
+          diskAgents.defaults = diskDefaults;
+          diskConfig.agents = diskAgents;
+          await writeFile(configPath, JSON.stringify(diskConfig, null, 2) + "\n", "utf-8");
+        } catch {
+          // Non-fatal — gateway may still have it in-memory
+        }
+
         // Reindex is best-effort — the config patch (extraPaths) already succeeded
         let reindexWarning: string | undefined;
         try {
