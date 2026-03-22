@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
 import { Header, AgentChatPanel } from "@/components/header";
@@ -13,11 +13,6 @@ import { OpenClawUpdateBanner } from "@/components/openclaw-update-banner";
 import { MissionControlUpdateBanner } from "@/components/mission-control-update-banner";
 import { ToastRenderer } from "@/components/toast-renderer";
 import { DashboardTourGate } from "@/components/dashboard-tour-gate";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -111,7 +106,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
       <body
-        className={`${inter.variable} ${geistMono.variable} antialiased`}
+        className={`${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
           <SetupGate>
